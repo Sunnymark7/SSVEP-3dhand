@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -214,6 +215,55 @@
         let currentHandSide = 'right';
         const frequencies = { thumb: 6, index: 7.5, middle: 10, ring: 12, pinky: 15 };
 
+        function applyHandMaterial(material) {
+            if (!material) return;
+
+            material.color = new THREE.Color(0xf3c7b3);
+            material.roughness = 0.82;
+            material.metalness = 0.0;
+            material.envMapIntensity = 0.28;
+
+            if ('clearcoat' in material) {
+                material.clearcoat = 0.08;
+                material.clearcoatRoughness = 0.7;
+            }
+
+            if ('sheen' in material) {
+                material.sheen = 0.12;
+                material.sheenRoughness = 0.85;
+                material.sheenColor = new THREE.Color(0xffd8cc);
+            }
+
+            material.needsUpdate = true;
+        }
+
+        function createLighting() {
+            const hemisphere = new THREE.HemisphereLight(0xfff2e6, 0x0d1424, 0.9);
+            scene.add(hemisphere);
+
+            const keyLight = new THREE.DirectionalLight(0xffe0cf, 2.6);
+            keyLight.position.set(-5, 8, 10);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 2048;
+            keyLight.shadow.mapSize.height = 2048;
+            keyLight.shadow.camera.near = 0.5;
+            keyLight.shadow.camera.far = 35;
+            keyLight.shadow.bias = -0.0008;
+            scene.add(keyLight);
+
+            const fillLight = new THREE.DirectionalLight(0xc7dbff, 1.1);
+            fillLight.position.set(7, 2, 6);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.DirectionalLight(0xffc8b0, 1.4);
+            rimLight.position.set(4, 7, -8);
+            scene.add(rimLight);
+
+            const palmAccent = new THREE.PointLight(0xffd4c1, 18, 20, 2);
+            palmAccent.position.set(0, -1.5, 6);
+            scene.add(palmAccent);
+        }
+
         function normalizeAngle(angle) {
             let normalized = angle;
 
@@ -233,21 +283,24 @@
 
         // 初始化
         function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111111);
+            scene = new THREE.Scene();    
+            scene.background = new THREE.Color(0x070b14);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);    
             camera.position.set(0, 1, 15);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.physicallyCorrectLights = true;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.08;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-            const light = new THREE.PointLight(0xffffff, 1);
-            light.position.set(0, 10, 10);
-            scene.add(light);
+            createLighting();
 
             window.addEventListener('resize', onWindowResize, false);
 
@@ -310,6 +363,17 @@
             // 骨骼遍历与指节提取
             bones = { thumb: [], index: [], middle: [], ring: [], pinky: [] };
             model.traverse(n => {
+                if (n.isMesh) {
+                    n.castShadow = true;
+                    n.receiveShadow = true;
+
+                    if (Array.isArray(n.material)) {
+                        n.material.forEach(applyHandMaterial);
+                    } else {
+                        applyHandMaterial(n.material);
+                    }
+                }
+
                 if (n.isBone) {
                     const name = n.name.toLowerCase();
                     if (name.includes('thumb')) bones.thumb.push(n);
